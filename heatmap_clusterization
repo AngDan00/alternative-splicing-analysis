@@ -1,0 +1,131 @@
+library(ComplexHeatmap)
+library(RColorBrewer)
+library(circlize)
+library(dplyr)
+library(shipunov)
+library(stringr)
+mainDir <- ""
+mainDir_project <- ""
+
+
+
+#wtd20homod20
+gene_WH20 <- file.path(mainDir,"geni_HOMOD_20WTD_20.tsv")
+gene_WH20 <- as.data.frame(read.table(gene_WH20, header = TRUE))
+gene_WH20$gene_id <- rownames(gene_WH20)
+gene_WH20 <- gene_WH20[gene_WH20$diffexpressed != 'INVARIANT',]
+gene_WH20 <- subset(gene_WH20, select =c(log2FoldChange,gene_id))
+names(gene_WH20)[names(gene_WH20) == 'log2FoldChange'] <- 'HOMOD20_WTD20'
+
+#wtd20wtd10
+gene_W1020 <- file.path(mainDir,"geni_WTD_20WTD_10.tsv")
+gene_W1020 <- as.data.frame(read.table(gene_W1020, header = TRUE))
+gene_W1020$gene_id <- rownames(gene_W1020)
+gene_W1020 <- subset(gene_W1020, select =c(log2FoldChange,gene_id))
+names(gene_W1020)[names(gene_W1020) == 'log2FoldChange'] <- 'WTD10_WTD20'
+
+gene_tab <- merge(gene_WH20,gene_W1020, by = 'gene_id')
+
+rownames(gene_tab) <- gene_tab$gene_id
+gene_tab <- subset(gene_tab, select = - c(gene_id))
+nrow(gene_tab)
+
+mat <-as.matrix(gene_tab)#center and scale each column (Z-score) then transpose
+
+#create the heatmap
+set.seed(123456)
+h <- Heatmap(mat, clustering_method_rows = 'single', km=5,
+             column_labels = colnames(mat), name="log2fc",
+             cluster_columns = F)
+ht = draw(h)
+#saving into pdf
+pdf(file.path(mainDir,paste0('heat_WTD20HOMOD20.pdf')))
+h
+dev.off()
+#extract cluster from heatmap 
+clusterlist = row_order(ht)
+clu_df <- lapply(names(clusterlist), function(i){
+  out <- data.frame(gene_id = rownames(mat)[clusterlist[[i]]],
+                    Cluster = paste0("cluster", i),
+                    stringsAsFactors = FALSE)
+  return(out)
+}) %>%  
+  do.call(rbind, .)
+write.table(clu_df,'clu_df.tsv',sep='\t')
+nrow(clu_df)
+#create fasta for cluster 1 genes
+cluster1 <- clu_df[clu_df$Cluster == 'cluster1',]
+# cluster1_fasta <- merge(cluster1,seq_table_genes, by = 'gene_id')
+# cluster1_fasta <- subset(cluster1_fasta,select=c(transcript_id,promoter_sequence))
+# cluster1_controls <- merge(cluster1_fasta, gene_table_deregolati, by= 'transcript_id')
+# cluster1_controls <- subset(cluster1_controls,select=c(control_sequence))
+# cluster1_controls <- as.data.frame(str_split_fixed(cluster1_controls$control_sequence, ' ', 6))
+# cluster1_control_list <- lapply(seq(1, ncol(cluster1_controls), by=2), function(i)
+#   as.data.frame(cluster1_controls[i: pmin((i+1), ncol(cluster1_controls))]))
+# names(cluster1_control_list[[1]]) <- names(cluster1_control_list[[2]]) <- names(cluster1_control_list[[3]])
+# cluster1_control <- rbind(cluster1_control_list[[1]], cluster1_control_list[[2]],cluster1_control_list[[3]])
+# cluster1_control <- unique(cluster1_control)
+# Write.fasta(cluster1_fasta,file.path(mainDir,'cluster1.fasta'))
+writeLines(cluster4$gene_id, file.path(mainDir,'cluster4.txt'))
+
+#2
+cluster2 <- clu_df[clu_df$Cluster == 'cluster2',]
+# cluster2_fasta <- merge(cluster2,seq_table_genes, by = 'gene_id')
+# cluster2_fasta <- subset(cluster2_fasta,select=c(transcript_id,promoter_sequence))
+# cluster2_controls <- merge(cluster2_fasta, gene_table_deregolati, by= 'transcript_id')
+# cluster2_controls <- subset(cluster2_controls,select=c(control_sequence))
+# cluster2_controls <- as.data.frame(str_split_fixed(cluster2_controls$control_sequence, ' ', 6))
+# cluster2_control_list <- lapply(seq(1, ncol(cluster2_controls), by=2), function(i)
+#   as.data.frame(cluster2_controls[i: pmin((i+1), ncol(cluster2_controls))]))
+# names(cluster2_control_list[[1]]) <- names(cluster2_control_list[[2]]) <- names(cluster2_control_list[[3]])
+# cluster2_control <- rbind(cluster2_control_list[[1]], cluster2_control_list[[2]],cluster2_control_list[[3]])
+# cluster2_control <- unique(cluster2_control)
+# Write.fasta(cluster2_fasta,file.path(mainDir,'cluster2.fasta'))
+# Write.fasta(cluster2_control,file.path(mainDir,'cluster2_control.fasta'))
+#3
+cluster3 <- clu_df[clu_df$Cluster == 'cluster3',]
+# cluster3_fasta <- merge(cluster3_target,seq_table_genes, by = 'gene_id')
+# cluster3_fasta <- subset(cluster3_fasta,select=c(transcript_id,promoter_sequence))
+# cluster3_controls <- merge(cluster3_fasta, gene_table_deregolati, by= 'transcript_id')
+# cluster3_controls <- subset(cluster3_controls,select=c(control_sequence))
+# cluster3_controls <- as.data.frame(str_split_fixed(cluster3_controls$control_sequence, ' ', 6))
+# cluster3_control_list <- lapply(seq(1, ncol(cluster3_controls), by=2), function(i)
+#   as.data.frame(cluster3_controls[i: pmin((i+1), ncol(cluster3_controls))]))
+# names(cluster3_control_list[[1]]) <- names(cluster3_control_list[[2]]) <- names(cluster3_control_list[[3]])
+# cluster3_control <- rbind(cluster3_control_list[[1]], cluster3_control_list[[2]],cluster3_control_list[[3]])
+# cluster3_control <- unique(cluster3_control)
+# Write.fasta(cluster3_fasta,file.path(mainDir,'cluster3.fasta'))
+# Write.fasta(cluster3_control,file.path(mainDir,'cluster3_control.fasta'))
+
+#4
+cluster4 <- clu_df[clu_df$Cluster == 'cluster4',]
+# cluster4_fasta <- merge(cluster4_target,seq_table_genes, by = 'gene_id')
+# cluster4_fasta <- subset(cluster4_fasta,select=c(transcript_id,promoter_sequence))
+# cluster4_controls <- merge(cluster4_fasta, gene_table_deregolati, by= 'transcript_id')
+# cluster4_controls <- subset(cluster4_controls,select=c(control_sequence))
+# cluster4_controls <- as.data.frame(str_split_fixed(cluster4_controls$control_sequence, ' ', 6))
+# cluster4_control_list <- lapply(seq(1, ncol(cluster4_controls), by=2), function(i)
+#   as.data.frame(cluster4_controls[i: pmin((i+1), ncol(cluster4_controls))]))
+# names(cluster4_control_list[[1]]) <- names(cluster4_control_list[[2]]) <- names(cluster4_control_list[[3]])
+# cluster4_control <- rbind(cluster4_control_list[[1]], cluster4_control_list[[2]],cluster4_control_list[[3]])
+# cluster4_control <- unique(cluster4_control)
+# Write.fasta(cluster4_fasta,file.path(mainDir,'cluster4.fasta'))
+# Write.fasta(cluster4_control,file.path(mainDir,'cluster4_control.fasta'))
+
+#5
+cluster5 <- clu_df[clu_df$Cluster == 'cluster5',]
+# cluster5_fasta <- merge(cluster5,seq_table_genes, by = 'gene_id')
+# cluster5_fasta <- subset(cluster5_fasta,select=c(transcript_id,promoter_sequence))
+# cluster5_controls <- merge(cluster5_fasta, gene_table_deregolati, by= 'transcript_id')
+# cluster5_controls <- subset(cluster5_controls,select=c(control_sequence))
+# 
+# cluster5_controls <- as.data.frame(str_split_fixed(cluster5_controls$control_sequence, ' ', 6))
+# 
+# cluster5_control_list <- lapply(seq(1, ncol(cluster5_controls), by=2), function(i)
+#   as.data.frame(cluster5_controls[i: pmin((i+1), ncol(cluster5_controls))]))
+# 
+# names(cluster5_control_list[[1]]) <- names(cluster5_control_list[[2]]) <- names(cluster5_control_list[[3]])
+# cluster5_control <- rbind(cluster5_control_list[[1]], cluster5_control_list[[2]],cluster5_control_list[[3]])
+# cluster5_control <- unique(cluster5_control)
+# Write.fasta(cluster5_fasta,file.path(mainDir,'cluster5.fasta'))
+# Write.fasta(cluster5_control,file.path(mainDir,'cluster5_control.fasta'))
