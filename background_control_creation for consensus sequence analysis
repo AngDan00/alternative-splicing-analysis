@@ -1,0 +1,129 @@
+library(stats)
+library(ggplot2)
+library(ggfortify)
+library(GenomicFeatures)
+library(readr)
+library(RColorBrewer)
+library(AnnotationDbi)
+library(org.Hs.eg.db)
+library(clusterProfiler)
+library(gpGeneSets)
+library(BinfTools)
+library(WebGestaltR)
+library(biomaRt)
+library(dplyr)
+library(GenomicRanges)
+library(rtracklayer)
+library(assertthat)
+library(tidyverse)
+library(phylotools)
+
+#gc content function
+gc_content <- function(seq) {
+  
+  assert_that(is.character(seq))
+  
+  seq <- toupper(seq)
+  
+  str_replace_all(seq,"[^GC]","") -> just_gc
+  
+  return(100*(nchar(just_gc)/nchar(seq)))
+  
+}
+
+mainDir <- ""
+contrast_dir <- ""
+memedir <-  paste0(mainDir,'/meme')
+sequence_file <- "" #a csv file of the counts
+gtf_dir <- ""
+condition_A <- "" 
+condition_B <- ""
+setwd(mainDir)
+
+#import gtf
+GTFfile <- file.path(gtf_dir," ")#insert gtf file name
+GTF <- import.gff(con=GTFfile , format="gtf", genome="GRCh38.p5", feature.type="transcript")
+GTF_data <- as.data.frame(GTF)
+
+#import diffexpr gene table 
+gene_table <- file.path(contrast_dir," ") #import your previously created table of differentially expressed genes in the 2 condition of interest
+gene_table <- as.data.frame(read.table(gene_table, header = TRUE))
+gene_table$gene_id <- rownames(gene_table)
+
+#import sequence file
+seq_table <- file.path(mainDir, sequence_file)
+seq_table <- as.data.frame(read.table(seq_table, header = TRUE))
+
+#merging seq_TABLE WITH GENE ID 
+seq_table_genes <- merge(seq_table, GTF_data[, c("transcript_id","gene_id")], by = "transcript_id")
+
+#now that i have gene id associated with transcript id I will merge the diff expressed gene 
+#table with the promoter sequence of the most expressed transcript 
+gene_table_promoter <- merge(seq_table_genes, gene_table, by = "gene_id")
+#I will now calculate the gc content of the sequence in the genes
+gene_table_promoter$GC <- 0
+seq <- c(as.character(gene_table_promoter$promoter_sequence))
+for (k in 1:length(seq)){
+  gene_table_promoter$GC[k] <- gc_content(seq[k])
+}
+gene_table_promoter$control_sequence <- 0
+gene_table_invariant <- gene_table_promoter[gene_table_promoter$diffexpressed == 'INVARIANT',]
+gene_table_deregolati <- gene_table_promoter[gene_table_promoter$diffexpressed != 'INVARIANT',]
+gene_table_deregolati <- gene_table_deregolati[gene_table_deregolati$gene_biotype == 'protein_coding',]
+#find a control sequence for deregulated genes
+
+seq_list <- c()
+for (k in 1:(nrow(gene_table_deregolati))){
+  GC = gene_table_deregolati$GC[k]
+  upperb = GC + (0.05* GC)
+  lowerb = GC - (0.05 * GC)
+  biotype = gene_table_deregolati$gene_biotype[k]
+  tmp <- gene_table_invariant[between(gene_table_invariant$GC, lowerb,upperb) & gene_table_invariant$gene_biotype ==  biotype,]
+  tmp <- tmp[!(rownames(tmp) %in% seq_list),]
+  if (nrow(tmp) >= 3){
+    five_controls_index <- sample(c(rownames(tmp)), size = 3)
+    seq_list <- append(seq_list, five_controls_index, 0)
+    five_controls <- tmp[five_controls_index, ]
+    five_controls_seq <- as.data.frame(t(five_controls$promoter_sequence))
+    five_controls_transcript <- as.data.frame(t(five_controls$transcript_id))
+    
+    controls <- paste0(five_controls_transcript$V1, sep=' ',five_controls_seq$V1, sep=' ', five_controls_transcript$V2, sep=' ',five_controls_seq$V2,
+                            sep=' ',five_controls_transcript$V3, sep=' ',five_controls_seq$V3) 
+    
+    gene_table_deregolati$control_sequence[k] <- controls
+
+  } 
+  else {
+    gene_table_deregolati$control_sequence[k] <- paste('no control sequence, increase treashold')
+  }
+}
+
+
+gene_table_promoter <- rbind(gene_table_deregolati,gene_table_invariant)
+write.table(gene_table_promoter, file.path(mainDir,'gene_table_max_promoter.tsv'),sep='\t')
+
+#GC Boxplot for double check 
+
+df_control_seq <- gene_table_invariant[seq_list,]
+df_control_seq_down <- df_control_seq[df_control_seq$diffexpressed != 'UP' & df_control_seq$diffexpressed != 'UP_HOMOD_20' ,]
+gene_table_deregolati <- gene_table_deregolati[gene_table_deregolati$control_sequence != 'no control sequence, increase treashold',]
+##FOR OTHER CASES APART FROM WTD10HOMOD10 FILTER FOR THE GC COLUMN ONLY OF THE GENES HAVING CONTROL 
+
+par(bty = "l")  
+boxplot(gene_table_deregolati$GC, df_control_seq$GC, main = "GCcontent",names = c("DEREGOLATI", "CONTROLLO"))
+
+#creating input list for meme suit 
+
+seq_table <- file.path(mainDir, sequence_file)
+seq_table <- as.data.frame(read.table(seq_table, header = TRUE))
+
+
+gene_table_down <- gene_table_deregolati[gene_table_deregolati$diffexpressed != 'UP' & gene_table_deregolati$diffexpressed != 'UP_HOMOD_20' ,]
+
+deregolati_meme <- gene_table_down[, c("transcript_id",'promoter_sequence')]
+control_meme <- df_control_seq_down[, c("transcript_id",'promoter_sequence')]
+
+
+library(shipunov)
+Write.fasta(deregolati_meme,file.path(mainDir,'downregolati_promoters.fasta'))
+Write.fasta(control_meme,file.path(mainDir,'control_downreg_promoters.fasta'))
